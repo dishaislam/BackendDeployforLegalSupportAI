@@ -25,7 +25,10 @@ def _get_qdrant_client():
     if _qdrant_client is None:
         from qdrant_client import QdrantClient
         logger.info(f"Connecting to Qdrant at {settings.QDRANT_URL} ...")
-        _qdrant_client = QdrantClient(url=settings.QDRANT_URL)
+        kwargs = {"url": settings.QDRANT_URL}
+        if settings.QDRANT_API_KEY:
+            kwargs["api_key"] = settings.QDRANT_API_KEY
+        _qdrant_client = QdrantClient(**kwargs)
         logger.info("Qdrant client ready.")
     return _qdrant_client
 
