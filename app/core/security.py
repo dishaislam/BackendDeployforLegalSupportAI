@@ -31,6 +31,9 @@ def _init_firebase():
     if sa_env:
         try:
             sa_dict = json.loads(sa_env)
+            # Restore escaped newlines in private key (Render may convert them)
+            if "private_key" in sa_dict:
+                sa_dict["private_key"] = sa_dict["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(sa_dict)
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin initialised from env var")
