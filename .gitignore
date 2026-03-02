@@ -1,1 +1,3 @@
 venv/
+bm25.pkl
+docstore.jsonl

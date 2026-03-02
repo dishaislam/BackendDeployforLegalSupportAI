@@ -42,7 +42,7 @@ CHUNK_OVERLAP_CHARS = int(os.getenv("CHUNK_OVERLAP_CHARS", "600"))
 JURISDICTION_DEFAULT = os.getenv("JURISDICTION_DEFAULT", "Bangladesh")
 SOURCE_DEFAULT = os.getenv("SOURCE_DEFAULT", "bdlaws.minlaw.gov.bd")
 VECTOR_SIZE = 384
-BATCH_SIZE = 200
+BATCH_SIZE = 20
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
@@ -159,7 +159,16 @@ def upsert_qdrant(client: QdrantClient, chunks: List[Dict], vectors: List[List[f
             )
             for c, v in zip(batch_c, batch_v)
         ]
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
+        # Retry up to 3 times on timeout
+        for attempt in range(3):
+            try:
+                client.upsert(collection_name=COLLECTION_NAME, points=points)
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise
+                logger.warning(f"  Retry {attempt+1}/3 after error: {e}")
+                import time; time.sleep(3)
         logger.info(f"  Uploaded {min(i + BATCH_SIZE, total)}/{total} chunks")
 
 
@@ -200,7 +209,7 @@ def main():
     ).tolist()
 
     logger.info(f"Connecting to Qdrant at {QDRANT_URL} ...")
-    kwargs = {"url": QDRANT_URL}
+    kwargs = {"url": QDRANT_URL, "timeout": 60}
     if QDRANT_API_KEY:
         kwargs["api_key"] = QDRANT_API_KEY
     client = QdrantClient(**kwargs)
