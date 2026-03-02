@@ -14,7 +14,6 @@ from app.core.config import settings
 from app.db.session import get_db
 from sqlalchemy import select
 from app.models.user import UserModel as User
-import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -27,31 +26,28 @@ def _init_firebase():
     if firebase_admin._apps:
         return
 
-    # Option A: FIREBASE_SERVICE_ACCOUNT_JSON (recommended on Render)
-    sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
-    if sa_json:
+    # Try env var first (JSON string for cloud deployment)
+    sa_env = os.getenv("FIREBASE_SERVICE_ACCOUNT", "").strip()
+    if sa_env:
         try:
-            # accept either a JSON string or base64 later if you want
-            data = json.loads(sa_json)
-            # Write to a temp file because firebase_admin expects a file path
-            fd, path = tempfile.mkstemp(prefix="firebase_sa_", suffix=".json")
-            with os.fdopen(fd, "w") as f:
-                json.dump(data, f)
-            cred = credentials.Certificate(path)
+            sa_dict = json.loads(sa_env)
+            cred = credentials.Certificate(sa_dict)
             firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin initialised (from env JSON)")
+            logger.info("Firebase Admin initialised from env var")
             return
         except Exception as e:
-            raise RuntimeError(f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+            logger.error(f"Failed to init Firebase from env var: {e}")
+            raise
 
-    # Option B: FIREBASE_SERVICE_ACCOUNT path (fallback)
-    path = os.getenv("FIREBASE_SERVICE_ACCOUNT", "/app/service_account.json")
+    # Fall back to file
+    path = "/app/service_account.json"
     if not os.path.exists(path):
-        raise RuntimeError(f"Firebase service account file not found at {path}")
+        raise RuntimeError(f"Firebase service account not found. Set FIREBASE_SERVICE_ACCOUNT env var.")
 
     cred = credentials.Certificate(path)
     firebase_admin.initialize_app(cred)
-    logger.info("Firebase Admin initialised (from file)")
+    logger.info("Firebase Admin initialised from file")
+
 
 _init_firebase()
 
